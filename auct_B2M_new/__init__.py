@@ -99,7 +99,7 @@ def create_round(subsession):
     instruments = Security.GetSecurities(securities_params, trd_ses)
     trader_params = [
         {
-            'Name': f'Signal {good} with accuracy {round(proba, 2)}',
+            'Name': f'Сигнал {good} с точностью {round(proba, 2)}',
             'PositionBounds': None,
             'InitialPositions': [1000] + [0] * len(goods)
         }
