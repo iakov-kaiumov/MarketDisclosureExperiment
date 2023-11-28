@@ -1,4 +1,5 @@
 from otree.api import *
+from typing import List
 
 from .TradingClasses import *
 
@@ -9,11 +10,26 @@ Dollar auction
 """
 
 
+params = [
+    (2, 0.9),
+    (2, 0.75),
+    (2, 0.6),
+    (3, 0.75),
+    (3, 0.6),
+    (3, 0.45),
+    (5, 0.75),
+    (5, 0.6),
+    (5, 0.45),
+    (5, .3)
+]
+
+
 class Constants(BaseConstants):
     name_in_url = 'auct_B2M_new'
     instructions_template = 'auct_B2M_new/instructions.html'
     players_per_group = None
-    num_rounds = 8
+    num_rounds = len(params)
+
     # jackpot = 100 # не 
     # instrum_num = 2
 
@@ -25,97 +41,88 @@ class Subsession(BaseSubsession):
 
 
 # распределить типы по игрокам
-def get_types(subsession, types_num):
-    return [(i + subsession.round_number) % types_num for i in range(subsession.session.num_participants)]
+def get_types(subsession, types_num, proba, winning_good_index):
+    result = []
+    other_indices = [i for i in range(types_num) if i != winning_good_index]
+    for i in range(subsession.session.num_participants):
+        if random.random() < proba:
+            result.append(winning_good_index)
+        else:
+            result.append(np.random.choice(other_indices))
+    return result
+
+
+def predict_winning_good(goods: List[str], winning_good: str, prob: float) -> str:
+    if random.random() < prob:
+        return winning_good
+    else:
+        g = goods.copy()
+        g.remove(winning_good)
+        return np.random.choice(g)
 
 
 # здесь инициализация всех параметров
 def create_round(subsession):
     print('session id', id(subsession.session))
 
-    # TODO - сделать загрузку из файла
-    if subsession.round_number == 1:
+    goods_count, proba = params[subsession.round_number - 1]
+    goods = ['A', 'B', 'C', 'D', 'E'][:goods_count]
+    winning_good_index = random.randint(0, len(goods) - 1)
+    winning_good = goods[winning_good_index]
 
-        # словарь всех параметров которые нужно изменить по сравнению с дефолтными
-        ses_params = {
-            'NumPeriodsPerTrial': 3,
-            'PeriodLength': 240,
-            'TimerEnabled': True,
+    # словарь всех параметров которые нужно изменить по сравнению с дефолтными
+    ses_params = {
+        'NumPeriodsPerTrial': 1,
+        'PeriodLength': 240,
+        'TimerEnabled': True
+    }
+    trd_ses = TradeSession(ses_params)
+
+    securities_params = [
+        {
+            'Name': 'Cash',
+            'Type': 'Currency',
+            'Rates': [[0.0], [0.0], [0.0]]
         }
-        trd_ses = TradeSession(ses_params)
+    ]
+    for good in goods:
+        securities_params.append({
+            'Name': f'Stock {good}',
+            'Type': 'Bond',
+            'StartPeriod': 1,
+            'PeriodCounts': 1,
+            'PriceBounds': (0, 10000),
+            'MaxQtyBound': 10000,
+            'Payouts': [100 if good == winning_good else 0]
+        })
 
-        securities_params = [
-            {
-                'Name': 'Cash',
-                'Type': 'Currency',
-                'Rates': [[0.04, 0.1, 0.25], [0.04, 0.1, 0.15], [0.04, 0.15, 0.15], [0.04, 0.1, 0.25],
-                          [0.04, 0.1, 0.25], [0.04, 0.1, 0.15], [0.04, 0.1, 0.15], [0.04, 0.15, 0.25]]
-            },
-            {
-                'Name': 'CpBond',
-                'Type': 'Bond',
-                'StartPeriod': 1,
-                'PeriodCounts': 3,
-                'PriceBounds': (0, 10000),
-                'MaxQtyBound': 10000,
-                'Payouts': [10, 10, 110]
-            },
-            {
-                'Name': 'Zero 1',
-                'Type': 'Bond',
-                'StartPeriod': 1,
-                'PeriodCounts': 1,
-                'PriceBounds': (0, 10000),
-                'MaxQtyBound': 10000,
-                'Payouts': [100, 0, 0]
-            },
-            {
-                'Name': 'Zero 2',
-                'Type': 'Bond',
-                'StartPeriod': 1,
-                'PeriodCounts': 2,
-                'PriceBounds': (0, 10000),
-                'MaxQtyBound': 10000,
-                'Payouts': [0, 100, 0]
-            },
-            {
-                'Name': 'Zero 3',
-                'Type': 'Bond',
-                'StartPeriod': 1,
-                'PeriodCounts': 3,
-                'PriceBounds': (0, 10000),
-                'MaxQtyBound': 10000,
-                'Payouts': [0, 0, 100]
-            }
-        ]
-        instruments = Security.GetSecurities(securities_params, trd_ses)
-        trader_params = [
-            {
-                'Name': "1",
-                'PositionBounds': None,
-                'InitialPositions': [1000, 10, 5, 6, 10]
-            },
-            {
-                'Name': "2",
-                'PositionBounds': None,
-                'InitialPositions': [1000, 10, 5, 6, 10]
-            }
-        ]
-        trader_types = TraderType.GetFromList(trader_params, trd_ses, instruments)
-        traders = [Trader(trader_types[tt]) for tt in get_types(subsession, len(trader_types))]
-        subsession.session.vars['traders_types'] = trader_types
-        subsession.session.vars['instruments'] = instruments
-        subsession.session.vars['trade_session'] = trd_ses
-        subsession.session.vars['traders'] = traders
-        subsession.session.vars['market'] = Market(trd_ses, instruments, traders)
+    instruments = Security.GetSecurities(securities_params, trd_ses)
+    trader_params = [
+        {
+            'Name': f'Signal {good} with accuracy {round(proba, 2)}',
+            'PositionBounds': None,
+            'InitialPositions': [1000] + [0] * len(goods)
+        }
+        for good in goods
+    ]
+    trader_types = TraderType.GetFromList(trader_params, trd_ses, instruments)
+    traders = [
+        Trader(trader_types[tt]) for tt in get_types(subsession, len(trader_types), proba, winning_good_index)
+    ]
+    subsession.session.vars['traders_types'] = trader_types
+    subsession.session.vars['instruments'] = instruments
+    subsession.session.vars['trade_session'] = trd_ses
+    subsession.session.vars['traders'] = traders
+    subsession.session.vars['market'] = Market(trd_ses, instruments, traders)
 
-    else:
-        trader_types = subsession.session.vars['traders_types']
-        traders = subsession.session.vars['traders']
-        for i, tt in enumerate(get_types(subsession, len(trader_types))):
-            traders[i].ChangeType(trader_types[tt])
+    subsession.session.vars['proba'] = proba
+    subsession.session.vars['winning_good'] = winning_good
+
+    index = 0
     for p in subsession.get_players():
         p.isAdmin = (p.participant.label == 'admin')
+        p.trader = index
+        index += 1
 
 
 class Group(BaseGroup):
@@ -152,6 +159,7 @@ def get_instrument(g, num) -> Security:
 
 
 class Player(BasePlayer):
+    trader = models.IntegerField()
     isAdmin = models.BooleanField()
     finalCash = models.FloatField()
     score = models.FloatField()
@@ -191,7 +199,7 @@ def custom_export(players):
     instrs.sort()
     yield ['session.code', 'trial', 'period', 'time', 'trd', 'state'] + [instr_name.get(i, '') for i in instrs]
     for k in pos_dict:
-        yield pos_dict[k][0][:-2] + [pos_dict[k][i][-1] for i in instrs]
+        yield pos_dict[k][0][:-2] + [pos_dict[k][i][-1] for i in instrs if i in pos_dict[k]]
 
     payments_dict = {}
     paym = Payments.filter()
@@ -204,7 +212,7 @@ def custom_export(players):
 
     yield ['session.code', 'trial', 'period'] + [instr_name.get(i, '') for i in instrs if i >= 0]
     for k in payments_dict:
-        yield payments_dict[k][0][:-2] + [payments_dict[k][i][-1] for i in instrs if i >= 0]
+        yield payments_dict[k][0][:-2] + [payments_dict[k][i][-1] for i in instrs if i >= 0 and i in payments_dict[k]]
 
     # yield ['trial', 'period', 'trd', 'instr', 'state', 'quantity', 'time']
     # # 'filter' without any args returns everything
@@ -319,6 +327,7 @@ class Bid(Page):
     @staticmethod
     def vars_for_template(player):
         market = get_market(player)
+        trader = get_traders(player)[player.trader]
         return {
             'instrums': [{'id': i, 'name': instr.Name} for i, instr in enumerate(market.instrs) if
                          (instr.Type != "Currency") or instr.Tradable],
@@ -326,6 +335,9 @@ class Bid(Page):
                            (instr.Type == "Currency") and (not instr.Tradable)],
             'asks_range': [5 - i for i in range(6)],
             'bids_range': [i for i in range(6)],
+            'type': trader.Type.Name,
+            'proba': player.session.vars['proba'],
+            'winning_good': player.session.vars['winning_good']
         }
 
     # сформировать сообщение для игроков (добавляет вспомогательные поля)
@@ -465,7 +477,7 @@ class Bid(Page):
             # сохранить все позиции
             Bid.save_all_pos(group, market, ts, 1)
             # провести расчеты по инструментам (выплаты, определения сценарияв и т.п.)
-            market.EndPeriod()
+            market.EndPeriod(session.vars['winning_good'])
             # сохранить новые позиции
             Bid.save_all_pos(group, market, ts, 2)
             # сохранить все сообщения

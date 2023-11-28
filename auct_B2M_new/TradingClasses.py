@@ -48,7 +48,7 @@ class TradeSession(LoadParams):
     CurrentTimeMessagesNum = 0  # текущий номер сообщения по времени (если они включены)
 
     # настраиваемые параметры
-    NumPeriodsPerTrial = 3  # число периодов в одной игре
+    NumPeriodsPerTrial = 1  # число периодов в одной игре
     PeriodLength = 240  # длительность одного периодов в секундах (или число - тогда одинаково для всех периодов, или список с указанием для каждого)
     TimerEnabled = True  # TODO (не реализовано) включить обратный отсчет (можно указать списком по периодам или одним значением)
     ScenarioList = None  # заданный список реализации сценариев (по играм, если задан то реализуется сценарий из списка, если нет то случайны)
@@ -62,8 +62,7 @@ class TradeSession(LoadParams):
     # period - номер периода, в конце которого происходит это событие
     # variants - список возможных событий
     # messages - список сообщений, которое рассылается игрокам (для каждого события одно сообщение)
-    EventSettings = {'e1': {'period': 1, 'variants': ['a', 'b', 'c'], 'messages': ['', '', '']},
-                     'e2': {'period': 1, 'variants': ['a', 'b', 'c'], 'messages': ['', '', '']}, }
+    EventSettings = {}
 
     # список реализаций событий - элемент это словарь где для каждого события указывается его вариант реализации
     EventSettingsPredetermined = [{'e1': 'a', 'e2': 'b'},  # игра 1
@@ -759,7 +758,7 @@ class TraderType(LoadParams):
 
 # трейдер - класс для каждого игрока, где хранятся всего его данные (позиции, сделки и т.п.)
 # не имеет внешних настроек (все настройки в типах)
-class Trader():
+class Trader:
     PrivateMessages = []
 
     def __init__(self, tp: TraderType):
@@ -977,6 +976,7 @@ class Market:
             i.NewTrial()
         for t in self.trds:
             t.NewTrial()
+            t.SendPrivateMessage(0, t.Type.Name)
         self.wasChanged = np.zeros((len(self.trds), len(self.instrs)), dtype=np.bool)
         self.ExogeneousInstrs = [i for i, instr in enumerate(self.instrs) if instr.Exogeneous]
         self.hasExogeneous = (len(self.ExogeneousInstrs) > 0)
@@ -1005,11 +1005,13 @@ class Market:
                     t.SendPrivateMessage(0, m)
 
     # завершить период
-    def EndPeriod(self):
+    def EndPeriod(self, winning_good: str):
+        print("PUPA")
         self.ts.EndPeriod()
         for i in self.instrs:
             i.EndPeriod()
         for t in self.trds:
+            t.SendPrivateMessage(0, f'Prices: {winning_good} - 100, others - 0')
             t.EndPeriod()
         self.CheckEventMessages()
 
