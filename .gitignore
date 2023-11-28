@@ -1,0 +1,5 @@
+db.sqlite3
+/_static/
+/orderbook/
+/venv/
+/.idea/
