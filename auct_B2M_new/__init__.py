@@ -19,8 +19,7 @@ params = [
     (3, 0.45),
     (5, 0.75),
     (5, 0.6),
-    (5, 0.45),
-    (5, .3)
+    (5, 0.45)
 ]
 
 
@@ -73,7 +72,7 @@ def create_round(subsession):
     # словарь всех параметров которые нужно изменить по сравнению с дефолтными
     ses_params = {
         'NumPeriodsPerTrial': 1,
-        'PeriodLength': 240,
+        'PeriodLength': 150,
         'TimerEnabled': True
     }
     trd_ses = TradeSession(ses_params)
@@ -101,7 +100,7 @@ def create_round(subsession):
         {
             'Name': f'Сигнал {good} с точностью {round(proba, 2)}',
             'PositionBounds': None,
-            'InitialPositions': [1000] + [0] * len(goods)
+            'InitialPositions': [1000] + [10] * len(goods)
         }
         for good in goods
     ]
