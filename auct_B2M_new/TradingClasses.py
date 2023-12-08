@@ -1011,7 +1011,7 @@ class Market:
         for i in self.instrs:
             i.EndPeriod()
         for t in self.trds:
-            t.SendPrivateMessage(0, f'Prices: {winning_good} - 100, others - 0')
+            t.SendPrivateMessage(0, f'Стоимость акции {winning_good} составила 100, все остальные акции обесценились')
             t.EndPeriod()
         self.CheckEventMessages()
 

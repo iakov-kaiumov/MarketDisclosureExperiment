@@ -98,7 +98,7 @@ def create_round(subsession):
     instruments = Security.GetSecurities(securities_params, trd_ses)
     trader_params = [
         {
-            'Name': f'Сигнал {good} с точностью {round(proba, 2)}',
+            'Name': f'Источник сообщил, что стоимость акции {good} составит 100\n(сообщение истинно с вероятностью {round(proba, 2)})',
             'PositionBounds': None,
             'InitialPositions': [1000] + [10] * len(goods)
         }
